@@ -1,32 +1,33 @@
-import 'package:chatpal/screens/signup_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:chatpal/services/auth_service.dart';
 
-class LoginScreen extends StatefulWidget {
+class SignUpScreen extends StatefulWidget {
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  _SignUpScreenState createState() => _SignUpScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignUpScreenState extends State<SignUpScreen> {
   final AuthService _auth = AuthService();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  void login() async {
-    var user = await _auth.signIn(
-        emailController.text.trim(), passwordController.text.trim());
+  void signUp() async {
+    var user = await _auth.signUp(
+      emailController.text.trim(),
+      passwordController.text.trim(),
+    );
     if (user != null) {
-      print("Login Successful: ${user.email}");
+      print("Sign-Up Successful: ${user.email}");
       // Navigate to chat screen
     } else {
-      print("Login Failed");
+      print("Sign-Up Failed");
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('ChatPal Login')),
+      appBar: AppBar(title: Text('ChatPal Sign Up')),
       body: Padding(
         padding: EdgeInsets.all(16),
         child: Column(
@@ -42,18 +43,9 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             SizedBox(height: 20),
             ElevatedButton(
-              onPressed: login,
-              child: Text('Login'),
+              onPressed: signUp,
+              child: Text('Sign Up'),
             ),
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => SignUpScreen()),
-                );
-              },
-              child: Text("Don't have an account? Sign Up"),
-            )
           ],
         ),
       ),
