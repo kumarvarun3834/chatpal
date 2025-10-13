@@ -1,6 +1,6 @@
-import 'package:chatpal/screens/signup_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:chatpal/services/auth_service.dart';
+import 'package:chatpal/screens/signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -49,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => SignUpScreen()),
+                  MaterialPageRoute(builder: (context) => ProfileSetupScreen(email: '',)),
                 );
               },
               child: Text("Don't have an account? Sign Up"),

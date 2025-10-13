@@ -1,50 +1,90 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:chatpal/services/auth_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
-class SignUpScreen extends StatefulWidget {
+class ProfileSetupScreen extends StatefulWidget {
+  final String email; // Pass the signed-up user's email
+
+  ProfileSetupScreen({required this.email});
+
   @override
-  _SignUpScreenState createState() => _SignUpScreenState();
+  _ProfileSetupScreenState createState() => _ProfileSetupScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
-  final AuthService _auth = AuthService();
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController bioController = TextEditingController();
+  File? _profileImage;
 
-  void signUp() async {
-    var user = await _auth.signUp(
-      emailController.text.trim(),
-      passwordController.text.trim(),
-    );
-    if (user != null) {
-      print("Sign-Up Successful: ${user.email}");
-      // Navigate to chat screen
-    } else {
-      print("Sign-Up Failed");
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> pickImage() async {
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _profileImage = File(pickedFile.path);
+      });
     }
+  }
+
+  Future<void> saveProfile() async {
+    String? imageUrl;
+    if (_profileImage != null) {
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('profile_pictures')
+          .child('${widget.email}.jpg');
+      await storageRef.putFile(_profileImage!);
+      imageUrl = await storageRef.getDownloadURL();
+    }
+
+    await FirebaseFirestore.instance
+        .collection('db_user')
+        .doc(widget.email)
+        .set({
+      'name': nameController.text.trim(),
+      'bio': bioController.text.trim(),
+      'profilePicture': imageUrl ?? '',
+    });
+
+    // Navigate to main chat screen or home screen
+    Navigator.pushReplacementNamed(context, '/home');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('ChatPal Sign Up')),
+      appBar: AppBar(title: Text('Setup Profile')),
       body: Padding(
         padding: EdgeInsets.all(16),
         child: Column(
           children: [
+            GestureDetector(
+              onTap: pickImage,
+              child: CircleAvatar(
+                radius: 50,
+                backgroundImage:
+                _profileImage != null ? FileImage(_profileImage!) : null,
+                child: _profileImage == null
+                    ? Icon(Icons.add_a_photo, size: 50)
+                    : null,
+              ),
+            ),
+            SizedBox(height: 20),
             TextField(
-              controller: emailController,
-              decoration: InputDecoration(labelText: 'Email'),
+              controller: nameController,
+              decoration: InputDecoration(labelText: 'Name'),
             ),
             TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: InputDecoration(labelText: 'Password'),
+              controller: bioController,
+              decoration: InputDecoration(labelText: 'Bio'),
             ),
             SizedBox(height: 20),
             ElevatedButton(
-              onPressed: signUp,
-              child: Text('Sign Up'),
+              onPressed: saveProfile,
+              child: Text('Save Profile'),
             ),
           ],
         ),
