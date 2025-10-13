@@ -78,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (context) =>
-                        ProfileSetupScreen(email: emailController.text.trim()),
+                    ProfileCreationScreen()
                   ),
                 );
               },

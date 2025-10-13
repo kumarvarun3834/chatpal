@@ -1,104 +1,90 @@
-import 'dart:io';
+// lib/screens/profile_creation_screen.dart
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'home_screen.dart';
+import '../services/auth_service.dart';
+import 'profile_setup_screen.dart';
 
-class ProfileSetupScreen extends StatefulWidget {
-  final String email;
-
-  ProfileSetupScreen({required this.email});
-
+class ProfileCreationScreen extends StatefulWidget {
   @override
-  _ProfileSetupScreenState createState() => _ProfileSetupScreenState();
+  _ProfileCreationScreenState createState() => _ProfileCreationScreenState();
 }
 
-class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController bioController = TextEditingController();
-  File? _profileImage;
-  final ImagePicker _picker = ImagePicker();
+class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
+  final AuthService _auth = AuthService();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmController = TextEditingController();
   bool _isLoading = false;
 
-  Future<void> pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() => _profileImage = File(pickedFile.path));
-    }
-  }
+  void createProfile() async {
+    String email = emailController.text.trim();
+    String password = passwordController.text.trim();
+    String confirm = confirmController.text.trim();
 
-  Future<void> saveProfile() async {
+    if (password != confirm) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Passwords do not match')));
+      return;
+    }
+
     setState(() => _isLoading = true);
 
-    String imageUrl = '';
-    if (_profileImage != null) {
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_pictures')
-          .child('${widget.email}.jpg');
-      await storageRef.putFile(_profileImage!);
-      imageUrl = await storageRef.getDownloadURL();
-    }
-
-    await FirebaseFirestore.instance
-        .collection('db_user')
-        .doc(widget.email)
-        .set({
-      'name': nameController.text.trim(),
-      'bio': bioController.text.trim(),
-      'profilePicture': imageUrl,
-    });
+    var user = await _auth.signUp(email, password);
 
     setState(() => _isLoading = false);
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => HomeScreen()),
-    );
+    if (user != null) {
+      // Navigate to Profile Setup
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProfileSetupScreen(email: email),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Sign-up failed')));
+    }
   }
 
   @override
   void dispose() {
-    nameController.dispose();
-    bioController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    confirmController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Setup Profile')),
+      appBar: AppBar(title: Text('Create Account')),
       body: Padding(
         padding: EdgeInsets.all(16),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            GestureDetector(
-              onTap: pickImage,
-              child: CircleAvatar(
-                radius: 50,
-                backgroundImage:
-                _profileImage != null ? FileImage(_profileImage!) : null,
-                child: _profileImage == null
-                    ? Icon(Icons.add_a_photo, size: 50)
-                    : null,
-              ),
-            ),
-            SizedBox(height: 20),
             TextField(
-              controller: nameController,
-              decoration: InputDecoration(labelText: 'Name'),
+              controller: emailController,
+              decoration: InputDecoration(labelText: 'Email'),
             ),
+            SizedBox(height: 10),
             TextField(
-              controller: bioController,
-              decoration: InputDecoration(labelText: 'Bio'),
+              controller: passwordController,
+              obscureText: true,
+              decoration: InputDecoration(labelText: 'Password'),
+            ),
+            SizedBox(height: 10),
+            TextField(
+              controller: confirmController,
+              obscureText: true,
+              decoration: InputDecoration(labelText: 'Confirm Password'),
             ),
             SizedBox(height: 20),
             _isLoading
                 ? CircularProgressIndicator()
                 : ElevatedButton(
-              onPressed: saveProfile,
-              child: Text('Save Profile'),
+              onPressed: createProfile,
+              child: Text('Next: Profile Setup'),
             ),
           ],
         ),

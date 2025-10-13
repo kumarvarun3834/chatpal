@@ -7,7 +7,7 @@ class ProfileForm extends StatefulWidget {
   final String? initialName;
   final String? initialBio;
   final String? initialImageUrl;
-  final void Function(String name, String bio, File? image) onSave;
+  final Future<void> Function(String name, String bio, File? image) onSave;
 
   ProfileForm({
     this.initialName,
@@ -41,7 +41,7 @@ class _ProfileFormState extends State<ProfileForm> {
     }
   }
 
-  void save() async {
+  Future<void> save() async {
     setState(() => _isLoading = true);
     await widget.onSave(nameController.text.trim(), bioController.text.trim(), _profileImage);
     setState(() => _isLoading = false);
@@ -67,7 +67,8 @@ class _ProfileFormState extends State<ProfileForm> {
                 : (widget.initialImageUrl != null && widget.initialImageUrl!.isNotEmpty)
                 ? NetworkImage(widget.initialImageUrl!) as ImageProvider
                 : null,
-            child: (_profileImage == null && (widget.initialImageUrl == null || widget.initialImageUrl!.isEmpty))
+            child: (_profileImage == null &&
+                (widget.initialImageUrl == null || widget.initialImageUrl!.isEmpty))
                 ? Icon(Icons.add_a_photo, size: 50)
                 : null,
           ),
