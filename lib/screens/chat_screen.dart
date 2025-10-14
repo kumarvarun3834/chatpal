@@ -1,16 +1,19 @@
 // lib/screens/chat_screen.dart
 
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:chatpal/widgets/message_bubble.dart';
 import 'package:chatpal/services/firestore_service.dart';
-import 'package:chatpal/models/message_model.dart';
+import 'package:chatpal/widgets/message_bubble.dart';
 
 class ChatScreen extends StatefulWidget {
-  final String receiverEmail;
+  final String receiverUid;
+  final String receiverName;
 
-  const ChatScreen({Key? key, required this.receiverEmail}) : super(key: key);
+  const ChatScreen({
+    Key? key,
+    required this.receiverUid,
+    required this.receiverName,
+  }) : super(key: key);
 
   @override
   _ChatScreenState createState() => _ChatScreenState();
@@ -20,42 +23,30 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FirestoreService _firestoreService = FirestoreService();
-  final String currentUserEmail = FirebaseAuth.instance.currentUser!.email!;
+  final String currentUserUid = FirebaseAuth.instance.currentUser!.uid;
 
   void sendMessage() async {
     String messageText = _messageController.text.trim();
     if (messageText.isEmpty) return;
 
-    final message = MessageModel(
-      message: messageText,
-      senderEmail: currentUserEmail,
-      type: 'text',
-      sentDate: DateTime.now(),
-      viewStatus: false,
-    );
+    try {
+      await _firestoreService.sendMessage(
+        senderUid: currentUserUid,
+        receiverUid: widget.receiverUid,
+        message: messageText, // just pass the string
+      );
 
-    final chatId = DateTime.now().millisecondsSinceEpoch.toString();
-
-    // Save message for sender
-    await _firestoreService.createChatDocument(
-      userEmail: currentUserEmail,
-      chatId: chatId,
-      message: message,
-    );
-
-    // Save message for receiver
-    await _firestoreService.createChatDocument(
-      userEmail: widget.receiverEmail,
-      chatId: chatId,
-      message: message,
-    );
-
-    _messageController.clear();
-    _scrollController.animateTo(
-      _scrollController.position.maxScrollExtent + 70,
-      duration: Duration(milliseconds: 300),
-      curve: Curves.easeOut,
-    );
+      _messageController.clear();
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent + 70,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sending message: $e')),
+      );
+    }
   }
 
   @override
@@ -72,37 +63,36 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.receiverEmail,
+          widget.receiverName,
           style: TextStyle(fontSize: 18 * textScale),
         ),
       ),
       body: Column(
         children: [
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('db_email')
-                  .doc(currentUserEmail)
-                  .collection('chats')
-                  .orderBy('sentDate')
-                  .snapshots(),
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _firestoreService.getMessages(
+                userUid: currentUserUid,
+                chatPartnerUid: widget.receiverUid,
+              ),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return Center(child: CircularProgressIndicator());
                 }
 
-                final docs = snapshot.data!.docs;
+                final messages = snapshot.data!;
+
                 return ListView.builder(
                   controller: _scrollController,
-                  itemCount: docs.length,
+                  itemCount: messages.length,
                   itemBuilder: (context, index) {
-                    var data = docs[index].data() as Map<String, dynamic>;
-                    bool isMe = data['sender'] == currentUserEmail;
+                    final msg = messages[index];
+                    bool isMe = msg['senderUid'] == currentUserUid;
 
                     return MessageBubble(
-                      message: data['message'] ?? '',
+                      message: msg['message'] ?? '',
                       isMe: isMe,
-                      viewStatus: data['viewStatus'] ?? false,
+                      viewStatus: msg['status'] == 'read',
                     );
                   },
                 );
@@ -134,7 +124,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       icon: Icon(Icons.send),
                       onPressed: sendMessage,
                     ),
-                  )
+                  ),
                 ],
               ),
             ),

@@ -64,47 +64,47 @@ class _LoginScreenState extends State<LoginScreen> {
   // ------------------------
   // Random User Generator
   // ------------------------
-  Future<void> _createRandomUser() async {
-    setState(() => _isLoading = true);
-
-    String email = 'user${DateTime.now().millisecondsSinceEpoch}@test.com';
-    String password = 'Test@1234';
-    String name = 'TestUser${DateTime.now().millisecondsSinceEpoch % 10000}';
-
-    try {
-      // 1️⃣ Create Firebase Auth user
-      UserCredential result =
-      await _auth.createUserWithEmailAndPassword(email: email, password: password);
-
-      User? user = result.user;
-
-      // 2️⃣ Add to Firestore db_user collection
-      if (user != null) {
-        await _firestore.collection('db_user').doc(user.uid).set({
-          'email': email,
-          'name': name,
-          'bio': 'This is a test user',
-          'profilePicture': '',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Random user created: $email')),
-        );
-      }
-
-      setState(() => _isLoading = false);
-    } on FirebaseAuthException catch (e) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error creating user: ${e.message}')),
-      );
-    } catch (e) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Unexpected error: $e')));
-    }
-  }
+  // Future<void> _createRandomUser() async {
+  //   setState(() => _isLoading = true);
+  //
+  //   String email = 'user${DateTime.now().millisecondsSinceEpoch}@test.com';
+  //   String password = 'Test@1234';
+  //   String name = 'TestUser${DateTime.now().millisecondsSinceEpoch % 10000}';
+  //
+  //   try {
+  //     // 1️⃣ Create Firebase Auth user
+  //     UserCredential result =
+  //     await _auth.createUserWithEmailAndPassword(email: email, password: password);
+  //
+  //     User? user = result.user;
+  //
+  //     // 2️⃣ Add to Firestore db_user collection
+  //     if (user != null) {
+  //       await _firestore.collection('db_user').doc(user.uid).set({
+  //         'email': email,
+  //         'name': name,
+  //         'bio': 'This is a test user',
+  //         'profilePicture': '',
+  //         'createdAt': FieldValue.serverTimestamp(),
+  //       });
+  //
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Random user created: $email')),
+  //       );
+  //     }
+  //
+  //     setState(() => _isLoading = false);
+  //   } on FirebaseAuthException catch (e) {
+  //     setState(() => _isLoading = false);
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Error creating user: ${e.message}')),
+  //     );
+  //   } catch (e) {
+  //     setState(() => _isLoading = false);
+  //     ScaffoldMessenger.of(context)
+  //         .showSnackBar(SnackBar(content: Text('Unexpected error: $e')));
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -135,12 +135,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Text('Login'),
                 ),
                 SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: _createRandomUser,
-                  child: Text('Generate Random Test User'),
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange),
-                ),
+                // ElevatedButton(
+                //   onPressed: _createRandomUser,
+                //   child: Text('Generate Random Test User'),
+                //   style: ElevatedButton.styleFrom(
+                //       backgroundColor: Colors.orange),
+                // ),
                 SizedBox(height: 10),
                 TextButton(
                   onPressed: () {

@@ -153,7 +153,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => ChatScreen(receiverEmail: user.email),
+                        builder: (_) => ChatScreen(
+                          receiverUid: user.uid,       // Use UID instead of email
+                          receiverName: user.name,     // Optional, for AppBar display
+                        ),
+
                       ),
                     );
                   },

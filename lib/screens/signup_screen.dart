@@ -103,7 +103,9 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
           name: '',
           bio: '',
           profilePicture: '',
+          uid: FirebaseAuth.instance.currentUser!.uid, // add UID here
         );
+
         await _firestoreService.createUser(newUser);
 
         setState(() => _isLoading = false);

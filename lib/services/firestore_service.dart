@@ -7,17 +7,19 @@ import '../models/message_model.dart';
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  /// Save a new user (creates db_user collection if not exists)
+  /// -------------------------------
+  /// USER OPERATIONS
+  /// -------------------------------
+
   Future<void> createUser(UserModel user) async {
     try {
       await _db.collection('db_user').doc(user.email).set(user.toMap());
-      print('User created: ${user.email}');
+      print('✅ User created/updated: ${user.email}');
     } catch (e) {
-      print('Error creating user: $e');
+      print('❌ Error creating user: $e');
     }
   }
 
-  /// Fetch a user by email
   Future<UserModel?> getUser(String email) async {
     try {
       DocumentSnapshot doc = await _db.collection('db_user').doc(email).get();
@@ -26,86 +28,116 @@ class FirestoreService {
       }
       return null;
     } catch (e) {
-      print('Error fetching user: $e');
+      print('❌ Error fetching user: $e');
       return null;
     }
   }
 
-  /// Search users by name
-  Future<List<UserModel>> searchUsersByName(String query) async {
+  Future<List<UserModel>> getAllUsers() async {
     try {
-      QuerySnapshot snapshot = await _db
-          .collection('db_user')
-          .where('name', isGreaterThanOrEqualTo: query)
-          .where('name', isLessThanOrEqualTo: query + '\uf8ff')
-          .get();
+      QuerySnapshot snapshot = await _db.collection('db_user').get();
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return UserModel(
+          email: doc.id,
+          name: data['name'] ?? '',
+          bio: data['bio'] ?? '',
+          profilePicture: data['profilePicture'] ?? '',
+          uid: data['uid'] ?? '', // fetch UID from Firestore if stored
+        );
 
-      return snapshot.docs
-          .map((doc) => UserModel.fromMap(doc.id, doc.data() as Map<String, dynamic>))
-          .toList();
+      }).toList();
     } catch (e) {
-      print('Error searching users: $e');
+      print('❌ Error fetching users: $e');
       return [];
     }
   }
 
   /// -------------------------------
-  /// MESSAGE OPERATIONS (db_email)
+  /// CHAT OPERATIONS (UID-based)
   /// -------------------------------
 
-  /// Create chat document for a user (db_email/<email>/chats)
-  Future<void> createChatDocument({
-    required String userEmail,
-    required MessageModel message,
-    required String chatId,
+  /// Send a message (stored under both sender & receiver)
+  Future<void> sendMessage({
+    required String senderUid,
+    required String receiverUid,
+    required String message,
   }) async {
+    final timestamp = FieldValue.serverTimestamp();
+
+    final msgData = {
+      'message': message,
+      'senderUid': senderUid,
+      'viewStatus': false,
+      'sentDate': timestamp,
+    };
+
+    final senderChatRef = _db
+        .collection('db_user')
+        .doc(senderUid)
+        .collection('chats')
+        .doc(receiverUid);
+
+    final receiverChatRef = _db
+        .collection('db_user')
+        .doc(receiverUid)
+        .collection('chats')
+        .doc(senderUid);
+
     try {
-      await _db
-          .collection('db_email')
-          .doc(userEmail)
-          .collection('chats')
-          .doc(chatId)
-          .set(message.toMap());
-      print('Chat created for $userEmail with id $chatId');
+      await senderChatRef.set({
+        'messages': FieldValue.arrayUnion([msgData])
+      }, SetOptions(merge: true));
+
+      await receiverChatRef.set({
+        'messages': FieldValue.arrayUnion([msgData])
+      }, SetOptions(merge: true));
+
+      print('✅ Message sent from $senderUid to $receiverUid');
     } catch (e) {
-      print('Error creating chat: $e');
+      print('❌ Error sending message: $e');
     }
   }
 
-  /// Fetch messages for a user
-  Future<List<MessageModel>> getMessages(String userEmail) async {
-    try {
-      QuerySnapshot snapshot = await _db
-          .collection('db_email')
-          .doc(userEmail)
-          .collection('chats')
-          .orderBy('sentDate', descending: false)
-          .get();
-
-      return snapshot.docs
-          .map((doc) => MessageModel.fromMap(doc.data() as Map<String, dynamic>))
-          .toList();
-    } catch (e) {
-      print('Error fetching messages: $e');
-      return [];
-    }
+  /// Stream messages between two users
+  Stream<List<Map<String, dynamic>>> getMessages({
+    required String userUid,
+    required String chatPartnerUid,
+  }) {
+    return _db
+        .collection('db_user')
+        .doc(userUid)
+        .collection('chats')
+        .doc(chatPartnerUid)
+        .snapshots()
+        .map((doc) {
+      if (!doc.exists) return [];
+      final data = doc.data();
+      return List<Map<String, dynamic>>.from(data?['messages'] ?? []);
+    });
   }
 
-  /// Mark message as read
-  Future<void> markMessageAsRead({
-    required String userEmail,
-    required String chatId,
+  /// Mark all messages as read
+  Future<void> markMessagesAsRead({
+    required String userUid,
+    required String chatPartnerUid,
   }) async {
-    try {
-      await _db
-          .collection('db_email')
-          .doc(userEmail)
-          .collection('chats')
-          .doc(chatId)
-          .update({'viewStatus': true});
-      print('Message $chatId marked as read for $userEmail');
-    } catch (e) {
-      print('Error updating view status: $e');
-    }
+    final docRef = _db
+        .collection('db_user')
+        .doc(userUid)
+        .collection('chats')
+        .doc(chatPartnerUid);
+
+    final snapshot = await docRef.get();
+    if (!snapshot.exists) return;
+
+    final messages = List<Map<String, dynamic>>.from(snapshot.data()?['messages'] ?? []);
+    final updatedMessages = messages.map((msg) {
+      msg['viewStatus'] = true;
+      return msg;
+    }).toList();
+
+    await docRef.update({'messages': updatedMessages});
+    print('✅ Messages marked as read for $userUid');
   }
 }
