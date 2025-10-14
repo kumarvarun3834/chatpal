@@ -63,40 +63,50 @@ class FirestoreService {
     required String receiverUid,
     required String message,
   }) async {
-    final timestamp = FieldValue.serverTimestamp();
+    final chatId = [senderUid, receiverUid]..sort();
+    final chatDoc = FirebaseFirestore.instance
+        .collection('chats')
+        .doc(chatId.join('_'));
 
-    final msgData = {
-      'message': message,
+    final msgRef = chatDoc.collection('messages').doc();
+
+    await msgRef.set({
       'senderUid': senderUid,
-      'viewStatus': false,
-      'sentDate': timestamp,
-    };
+      'receiverUid': receiverUid,
+      'message': message,
+      'timestamp': FieldValue.serverTimestamp(),
+      'status': 'sending',
+    });
 
-    final senderChatRef = _db
-        .collection('db_user')
-        .doc(senderUid)
+    // Simulate upload success → update to "sent"
+    await msgRef.update({'status': 'sent'});
+  }
+
+  Future<void> markAsDelivered({
+    required String senderUid,
+    required String receiverUid,
+  }) async {
+    final chatId = [senderUid, receiverUid]..sort();
+    final messages = await FirebaseFirestore.instance
         .collection('chats')
-        .doc(receiverUid);
+        .doc(chatId.join('_'))
+        .collection('messages')
+        .where('receiverUid', isEqualTo: receiverUid)
+        .where('status', isEqualTo: 'sent')
+        .get();
 
-    final receiverChatRef = _db
-        .collection('db_user')
-        .doc(receiverUid)
-        .collection('chats')
-        .doc(senderUid);
-
-    try {
-      await senderChatRef.set({
-        'messages': FieldValue.arrayUnion([msgData])
-      }, SetOptions(merge: true));
-
-      await receiverChatRef.set({
-        'messages': FieldValue.arrayUnion([msgData])
-      }, SetOptions(merge: true));
-
-      print('✅ Message sent from $senderUid to $receiverUid');
-    } catch (e) {
-      print('❌ Error sending message: $e');
+    for (final doc in messages.docs) {
+      await doc.reference.update({'status': 'delivered'});
     }
+  }
+
+  Future<void> markAsRead(String messageId, String chatId) async {
+    await FirebaseFirestore.instance
+        .collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .doc(messageId)
+        .update({'status': 'read'});
   }
 
   /// Stream messages between two users

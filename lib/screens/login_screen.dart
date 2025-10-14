@@ -106,6 +106,27 @@ class _LoginScreenState extends State<LoginScreen> {
   //   }
   // }
 
+  Future<void> _resetPassword() async {
+    final email = emailController.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please enter your email first.')),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Password reset link sent to $email')),
+      );
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? 'Error sending reset link')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -135,6 +156,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Text('Login'),
                 ),
                 SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.center,
+                  child: TextButton(
+                    onPressed: _resetPassword,
+                    child: Text('Forgot Password?'),
+                  ),
+                ),
                 // ElevatedButton(
                 //   onPressed: _createRandomUser,
                 //   child: Text('Generate Random Test User'),
@@ -159,5 +187,11 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
+  }
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
   }
 }
