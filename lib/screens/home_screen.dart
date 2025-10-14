@@ -150,16 +150,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(fontSize: 14 * textScale),
                   ),
                   onTap: () {
+                    // Navigate to ChatScreen
+                    UserModel selectedUser = users[index]; // inside ListView.builder or onTap
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => ChatScreen(
-                          receiverUid: user.uid,       // Use UID instead of email
-                          receiverName: user.name,     // Optional, for AppBar display
+                          receiverUid: selectedUser.uid,
+                          receiverName: selectedUser.name,
                         ),
-
                       ),
                     );
+
+
                   },
                 );
               },

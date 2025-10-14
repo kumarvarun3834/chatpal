@@ -1,11 +1,10 @@
-// lib/providers/auth_provider.dart
-
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
 
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
+  final FirestoreService _firestoreService = FirestoreService();
 
   UserModel? _currentUser;
   bool _isLoading = false;
@@ -26,25 +25,29 @@ class AuthProvider with ChangeNotifier {
     try {
       var user = await _authService.signUp(email, password);
       if (user != null) {
+        // Create a new UserModel with UID
         _currentUser = UserModel(
+          uid: user.uid,
           email: user.email!,
           name: '',
           bio: '',
           profilePicture: '',
         );
+
+        // Save user in Firestore
+        await _firestoreService.createUser(_currentUser!);
+
         _isLoading = false;
         notifyListeners();
         return true;
       }
-      _isLoading = false;
-      notifyListeners();
-      return false;
     } catch (e) {
       print('Sign-Up Error: $e');
-      _isLoading = false;
-      notifyListeners();
-      return false;
     }
+
+    _isLoading = false;
+    notifyListeners();
+    return false;
   }
 
   /// ------------------------------
@@ -60,25 +63,35 @@ class AuthProvider with ChangeNotifier {
     try {
       var user = await _authService.login(email, password);
       if (user != null) {
-        _currentUser = UserModel(
-          email: user.email!,
-          name: '',
-          bio: '',
-          profilePicture: '',
-        );
+        // Fetch user from Firestore
+        UserModel? firestoreUser = await _firestoreService.getUser(user.uid);
+
+        // If user exists in Firestore, use it; otherwise create a new UserModel
+        _currentUser = firestoreUser ??
+            UserModel(
+              uid: user.uid,
+              email: user.email!,
+              name: '',
+              bio: '',
+              profilePicture: '',
+            );
+
+        // If new user, save to Firestore
+        if (firestoreUser == null) {
+          await _firestoreService.createUser(_currentUser!);
+        }
+
         _isLoading = false;
         notifyListeners();
         return true;
       }
-      _isLoading = false;
-      notifyListeners();
-      return false;
     } catch (e) {
       print('Login Error: $e');
-      _isLoading = false;
-      notifyListeners();
-      return false;
     }
+
+    _isLoading = false;
+    notifyListeners();
+    return false;
   }
 
   /// ------------------------------
