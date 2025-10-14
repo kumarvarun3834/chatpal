@@ -22,6 +22,30 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingData();
+  }
+
+  Future<void> _loadExistingData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('db_user')
+        .doc(user.uid)
+        .get();
+
+    if (doc.exists) {
+      final data = doc.data()!;
+      nameController.text = data['name'] ?? '';
+      bioController.text = data['bio'] ?? 'Hey there! I am using ChatPal.'; // default bio
+    } else {
+      bioController.text = 'Hey there! I am using ChatPal.';
+    }
+  }
+
   Future<void> pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
@@ -50,7 +74,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       imageUrl = await storageRef.getDownloadURL();
     }
 
-    // Use UID as document ID
     await FirebaseFirestore.instance
         .collection('db_user')
         .doc(user.uid)
@@ -60,7 +83,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       'profilePicture': imageUrl,
       'email': user.email,
       'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true)); // merge true to not overwrite other fields
+    }, SetOptions(merge: true));
 
     setState(() => _isLoading = false);
 
