@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:chatpal/services/firestore_service.dart';
+import '../services/firestore_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final String receiverUid;
@@ -86,9 +86,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 chatPartnerUid: widget.receiverUid,
               ),
               builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return Center(child: CircularProgressIndicator());
-                }
+                if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
 
                 final messages = snapshot.data!;
                 final isSending = messages.any((m) => m['status'] == 'sending');
@@ -104,18 +102,12 @@ class _ChatScreenState extends State<ChatScreen> {
                           bool isMe = msg['senderUid'] == currentUserUid;
 
                           return Align(
-                            alignment: isMe
-                                ? Alignment.centerRight
-                                : Alignment.centerLeft,
+                            alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                             child: Container(
-                              margin: EdgeInsets.symmetric(
-                                  vertical: 4, horizontal: 8),
-                              padding: EdgeInsets.symmetric(
-                                  vertical: 8, horizontal: 12),
+                              margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                              padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                               decoration: BoxDecoration(
-                                color: isMe
-                                    ? Colors.blue[100]
-                                    : Colors.grey[200],
+                                color: isMe ? Colors.blue[100] : Colors.grey[200],
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Row(
@@ -140,7 +132,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
 
-                    // 🔶 Status bar for pending uploads
+                    // Status bar for pending uploads
                     if (isSending)
                       Container(
                         color: Colors.orange.shade50,
@@ -148,8 +140,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.cloud_upload,
-                                size: 16, color: Colors.orange),
+                            Icon(Icons.cloud_upload, size: 16, color: Colors.orange),
                             SizedBox(width: 6),
                             Text(
                               'Sending messages...',
@@ -164,7 +155,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
 
-          // ✉️ Message input bar
+          // Message input bar
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -178,8 +169,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       ),
                     ),
                   ),
