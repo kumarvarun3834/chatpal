@@ -4,6 +4,8 @@ import 'package:chatpal/screens/profile_module.dart';
 import 'package:chatpal/models/user_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'login_screen.dart';
+
 class HomeScreen extends StatefulWidget {
   @override
   _HomeScreenState createState() => _HomeScreenState();
@@ -33,7 +35,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void logout() async {
     await _auth.signOut();
-    Navigator.of(context).pushReplacementNamed('/login');
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => LoginScreen(), // your login screen widget
+      ),
+    );
   }
 
   void _filterUsers(String query) {

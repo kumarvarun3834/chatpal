@@ -12,7 +12,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Activate App Check with debug token
+  // Activate App Check in debug mode
   await FirebaseAppCheck.instance.activate(
     androidProvider: AndroidProvider.debug,
   );
@@ -23,17 +23,41 @@ void main() async {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    // Check if user is logged in
-    User? user = FirebaseAuth.instance.currentUser;
+    return StreamBuilder<User?>(
+      // Listen to auth state changes
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // While checking auth state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const MaterialApp(
+            home: Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
 
-    return MaterialApp(
-      title: 'ChatPal',
-      theme: ThemeData.light(),
-      darkTheme: ThemeData.dark(),
-      themeMode: ThemeMode.system,
-      debugShowCheckedModeBanner: false,
-      // Navigate based on login status
-      home: user != null ? HomeScreen() : LoginScreen(),
+        // If user is logged in
+        if (snapshot.hasData) {
+          return MaterialApp(
+            title: 'ChatPal',
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData.light(),
+            darkTheme: ThemeData.dark(),
+            themeMode: ThemeMode.system,
+            home: HomeScreen(),
+          );
+        }
+
+        // If user is NOT logged in
+        return MaterialApp(
+          title: 'ChatPal',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData.light(),
+          darkTheme: ThemeData.dark(),
+          themeMode: ThemeMode.system,
+          home: LoginScreen(),
+        );
+      },
     );
   }
 }

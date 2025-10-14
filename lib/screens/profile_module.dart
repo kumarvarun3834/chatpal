@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -31,24 +32,35 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   Future<void> saveProfile() async {
     setState(() => _isLoading = true);
 
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('No user logged in')));
+      setState(() => _isLoading = false);
+      return;
+    }
+
     String imageUrl = '';
     if (_profileImage != null) {
       final storageRef = FirebaseStorage.instance
           .ref()
           .child('profile_pictures')
-          .child('${widget.email}.jpg');
+          .child('${user.uid}.jpg');
       await storageRef.putFile(_profileImage!);
       imageUrl = await storageRef.getDownloadURL();
     }
 
+    // Use UID as document ID
     await FirebaseFirestore.instance
         .collection('db_user')
-        .doc(widget.email)
+        .doc(user.uid)
         .set({
       'name': nameController.text.trim(),
       'bio': bioController.text.trim(),
       'profilePicture': imageUrl,
-    });
+      'email': user.email,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true)); // merge true to not overwrite other fields
 
     setState(() => _isLoading = false);
 
