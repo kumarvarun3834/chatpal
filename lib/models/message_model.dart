@@ -1,10 +1,8 @@
-// lib/models/message_model.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Message model for ChatPal app
 class MessageModel {
-  final String senderEmail;   // Only store email for sender
+  final String senderEmail;   // who sent the message
   final String type;          // 'sent' or 'received'
   final DateTime sentDate;
   final String message;
@@ -25,7 +23,7 @@ class MessageModel {
     return {
       'senderEmail': senderEmail,
       'type': type,
-      'sentDate': sentDate,
+      'sentDate': Timestamp.fromDate(sentDate),
       'message': message,
       'viewStatus': viewStatus,
       'media': media ?? '',
@@ -49,59 +47,100 @@ class MessageModel {
 class MessageService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  /// Send a message (creates chat collection if not exists)
+  /// Send a message to both sender and receiver paths
   Future<void> sendMessage({
-    required String userEmail,        // sender email
-    required String chatId,           // unique message ID
+    required String senderEmail,
+    required String receiverEmail,
     required MessageModel message,
   }) async {
     try {
-      await _db
-          .collection('db_email')
-          .doc(userEmail)
-          .collection('chats')
-          .doc(chatId)
-          .set(message.toMap());
-      print('Message sent for $userEmail with id $chatId');
+      // References to both users’ chat paths
+      final senderRef = _db
+          .collection('db_user')
+          .doc(senderEmail)
+          .collection(receiverEmail)
+          .doc(); // auto message ID
+
+      final receiverRef = _db
+          .collection('db_user')
+          .doc(receiverEmail)
+          .collection(senderEmail)
+          .doc(); // same mirrored message
+
+      await _db.runTransaction((txn) async {
+        // Add "sent" message for sender
+        txn.set(senderRef, message.toMap());
+
+        // Add mirrored "received" message for receiver
+        txn.set(
+          receiverRef,
+          MessageModel(
+            senderEmail: senderEmail,
+            type: 'received',
+            sentDate: message.sentDate,
+            message: message.message,
+            viewStatus: false,
+            media: message.media,
+          ).toMap(),
+        );
+      });
+
+      print('✅ Message sent between $senderEmail and $receiverEmail');
     } catch (e) {
-      print('Error sending message: $e');
+      print('❌ Error sending message: $e');
     }
   }
 
-  /// Fetch all messages for a user
-  Future<List<MessageModel>> getMessages(String userEmail) async {
-    try {
-      QuerySnapshot snapshot = await _db
-          .collection('db_email')
-          .doc(userEmail)
-          .collection('chats')
-          .orderBy('sentDate', descending: false)
-          .get();
-
-      return snapshot.docs
-          .map((doc) => MessageModel.fromMap(doc.data() as Map<String, dynamic>))
-          .toList();
-    } catch (e) {
-      print('Error fetching messages: $e');
-      return [];
-    }
-  }
-
-  /// Update view status of a message
-  Future<void> markAsRead({
+  /// Stream messages between two users (live updates)
+  Stream<List<MessageModel>> streamMessages({
     required String userEmail,
-    required String chatId,
+    required String chatPartnerEmail,
+  }) {
+    return _db
+        .collection('db_user')
+        .doc(userEmail)
+        .collection(chatPartnerEmail)
+        .orderBy('sentDate', descending: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+        .map((doc) => MessageModel.fromMap(doc.data()))
+        .toList());
+  }
+
+  /// Mark all unread messages from sender as read
+  Future<void> markMessagesAsRead({
+    required String receiverEmail,
+    required String senderEmail,
   }) async {
     try {
-      await _db
-          .collection('db_email')
-          .doc(userEmail)
-          .collection('chats')
-          .doc(chatId)
-          .update({'viewStatus': true});
-      print('Message $chatId marked as read for $userEmail');
+      final query = await _db
+          .collection('db_user')
+          .doc(receiverEmail)
+          .collection(senderEmail)
+          .where('viewStatus', isEqualTo: false)
+          .get();
+
+      for (var doc in query.docs) {
+        await doc.reference.update({'viewStatus': true});
+      }
+
+      print('✅ Marked messages as read for $receiverEmail from $senderEmail');
     } catch (e) {
-      print('Error updating view status: $e');
+      print('❌ Error marking messages as read: $e');
     }
   }
 }
+
+//
+// db_user
+// └── bee@gmail.com
+// ├── xyz@gmail.com     ← chat partner
+// │    ├── autoMsgId1
+// │    │     ├── senderEmail: "bee@gmail.com"
+// │    │     ├── message: "Hey"
+// │    │     ├── type: "sent"
+// │    │     ├── viewStatus: true
+// │    │     ├── sentDate: ...
+// │    │     └── media: ""
+// │    └── autoMsgId2 ...
+//

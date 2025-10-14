@@ -1,5 +1,3 @@
-// lib/models/user_model.dart
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// User model for ChatPal app
@@ -36,7 +34,7 @@ class UserModel {
   }
 }
 
-/// Firestore helper for users
+/// Firestore helper for user and chat operations
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -44,9 +42,9 @@ class FirestoreService {
   Future<void> createUser(UserModel user) async {
     try {
       await _db.collection('db_user').doc(user.email).set(user.toMap());
-      print('User created/updated: ${user.email}');
+      print('✅ User created/updated: ${user.email}');
     } catch (e) {
-      print('Error creating user: $e');
+      print('❌ Error creating user: $e');
     }
   }
 
@@ -59,7 +57,7 @@ class FirestoreService {
       }
       return null;
     } catch (e) {
-      print('Error fetching user: $e');
+      print('❌ Error fetching user: $e');
       return null;
     }
   }
@@ -77,8 +75,105 @@ class FirestoreService {
           .map((doc) => UserModel.fromMap(doc.id, doc.data() as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print('Error searching users: $e');
+      print('❌ Error searching users: $e');
       return [];
     }
+  }
+
+  // ----------------------------------------------------------------
+  // 🔹 CHAT OPERATIONS (following your preferred structure)
+  // ----------------------------------------------------------------
+
+  /// Send a message (stored under both sender & receiver)
+  Future<void> sendMessage({
+    required String senderEmail,
+    required String receiverEmail,
+    required String message,
+  }) async {
+    final timestamp = FieldValue.serverTimestamp();
+
+    final msgData = {
+      'message': message,
+      'timestamp': timestamp,
+      'status': 'sent',
+      'type': 'sent',
+    };
+
+    final receiverMsgData = {
+      'message': message,
+      'timestamp': timestamp,
+      'status': 'delivered',
+      'type': 'received',
+    };
+
+    // Sender document → receiver subdoc
+    final senderChatRef = _db
+        .collection('db_user')
+        .doc(senderEmail)
+        .collection('chats')
+        .doc(receiverEmail);
+
+    // Receiver document → sender subdoc
+    final receiverChatRef = _db
+        .collection('db_user')
+        .doc(receiverEmail)
+        .collection('chats')
+        .doc(senderEmail);
+
+    try {
+      await senderChatRef.set({
+        'messages': FieldValue.arrayUnion([msgData])
+      }, SetOptions(merge: true));
+
+      await receiverChatRef.set({
+        'messages': FieldValue.arrayUnion([receiverMsgData])
+      }, SetOptions(merge: true));
+
+      print('✅ Message sent from $senderEmail to $receiverEmail');
+    } catch (e) {
+      print('❌ Error sending message: $e');
+    }
+  }
+
+  /// Stream messages between two users
+  Stream<List<Map<String, dynamic>>> getMessages({
+    required String userEmail,
+    required String chatPartnerEmail,
+  }) {
+    return _db
+        .collection('db_user')
+        .doc(userEmail)
+        .collection('chats')
+        .doc(chatPartnerEmail)
+        .snapshots()
+        .map((doc) {
+      if (!doc.exists) return [];
+      final data = doc.data();
+      return List<Map<String, dynamic>>.from(data?['messages'] ?? []);
+    });
+  }
+
+  /// Mark messages as read
+  Future<void> markMessagesAsRead({
+    required String receiverEmail,
+    required String senderEmail,
+  }) async {
+    final docRef = _db
+        .collection('db_user')
+        .doc(receiverEmail)
+        .collection('chats')
+        .doc(senderEmail);
+
+    final snapshot = await docRef.get();
+    if (!snapshot.exists) return;
+
+    final messages = List<Map<String, dynamic>>.from(snapshot.data()?['messages'] ?? []);
+    final updatedMessages = messages.map((msg) {
+      if (msg['status'] == 'delivered') msg['status'] = 'read';
+      return msg;
+    }).toList();
+
+    await docRef.update({'messages': updatedMessages});
+    print('✅ Messages marked as read');
   }
 }
