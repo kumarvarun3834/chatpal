@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/user_model.dart'; // <-- new
+import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import 'profile_setup_screen.dart';
 
@@ -14,7 +14,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmController = TextEditingController();
-  final FirestoreService _firestoreService = FirestoreService(); // <-- new
+  final FirestoreService _firestoreService = FirestoreService();
 
   bool _isLoading = false;
 
@@ -38,57 +38,80 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
 
       User? user = result.user;
 
-      if (user != null && !user.emailVerified) {
-        // Send verification email
-        await user.sendEmailVerification();
+      if (user != null) {
+        // -------------------------
+        // Email verification logic
+        // -------------------------
+        /*
+        if (!user.emailVerified) {
+          await user.sendEmailVerification();
+
+          setState(() => _isLoading = false);
+
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('Verify Your Email'),
+              content: Text(
+                'A verification email has been sent to $email. Please verify it before continuing.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    await user.reload();
+                    User? refreshedUser = FirebaseAuth.instance.currentUser;
+
+                    if (refreshedUser != null && refreshedUser.emailVerified) {
+                      Navigator.pop(context); // close dialog
+
+                      final newUser = UserModel(
+                        email: email,
+                        name: '',
+                        bio: '',
+                        profilePicture: '',
+                      );
+                      await _firestoreService.createUser(newUser);
+
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ProfileSetupScreen(email: email),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Email not verified yet.'),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('I Verified'),
+                ),
+              ],
+            ),
+          );
+        }
+        */
+
+        // -------------------------
+        // Direct Firestore creation
+        // -------------------------
+        final newUser = UserModel(
+          email: email,
+          name: '',
+          bio: '',
+          profilePicture: '',
+        );
+        await _firestoreService.createUser(newUser);
 
         setState(() => _isLoading = false);
 
-        // Show dialog to verify
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Verify Your Email'),
-            content: Text(
-              'A verification email has been sent to $email. Please verify it before continuing.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () async {
-                  await user.reload();
-                  User? refreshedUser = FirebaseAuth.instance.currentUser;
-
-                  if (refreshedUser != null && refreshedUser.emailVerified) {
-                    Navigator.pop(context); // close dialog
-
-                    // ✅ Create basic user entry in Firestore
-                    final newUser = UserModel(
-                      email: email,
-                      name: '',
-                      bio: '',
-                      profilePicture: '',
-                    );
-                    await _firestoreService.createUser(newUser);
-
-                    // Navigate to profile setup
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ProfileSetupScreen(email: email),
-                      ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Email not verified yet.'),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('I Verified'),
-              ),
-            ],
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProfileSetupScreen(email: email),
           ),
         );
       }
@@ -137,7 +160,7 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
                 ? const CircularProgressIndicator()
                 : ElevatedButton(
               onPressed: createProfile,
-              child: const Text('Send Verification Email'),
+              child: const Text('Create Account'),
             ),
           ],
         ),

@@ -62,23 +62,45 @@ class FirestoreService {
     }
   }
 
-  /// Search users by name (for search feature)
-  Future<List<UserModel>> searchUsersByName(String query) async {
+  Future<List<UserModel>> getAllUsers() async {
     try {
-      QuerySnapshot snapshot = await _db
-          .collection('db_user')
-          .where('name', isGreaterThanOrEqualTo: query)
-          .where('name', isLessThanOrEqualTo: query + '\uf8ff')
-          .get();
+      QuerySnapshot snapshot = await _db.collection('db_user').get();
 
-      return snapshot.docs
-          .map((doc) => UserModel.fromMap(doc.id, doc.data() as Map<String, dynamic>))
-          .toList();
+      return snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+
+        // Only read profile fields, ignore messages or other nested lists
+        return UserModel(
+          email: doc.id,
+          name: data['name'] ?? '',
+          bio: data['bio'] ?? '',
+          profilePicture: data['profilePicture'] ?? '',
+        );
+      }).toList();
     } catch (e) {
-      print('❌ Error searching users: $e');
+      print('❌ Error fetching users: $e');
       return [];
     }
   }
+
+  // /// Search users by name (for search feature)
+  // Future<List<UserModel>> searchUsersByName(String query) async {
+  //   try {
+  //     QuerySnapshot snapshot = await _db.collection('db_user').get();
+  //
+  //     // Filter in Dart
+  //     final lowerQuery = query.toLowerCase();
+  //     final users = snapshot.docs
+  //         .map((doc) => UserModel.fromMap(doc.id, doc.data() as Map<String, dynamic>))
+  //         .where((user) => user.name.toLowerCase().contains(lowerQuery))
+  //         .toList();
+  //
+  //     return users;
+  //   } catch (e) {
+  //     print('❌ Error searching users: $e');
+  //     return [];
+  //   }
+  // }
 
   // ----------------------------------------------------------------
   // 🔹 CHAT OPERATIONS (following your preferred structure)
