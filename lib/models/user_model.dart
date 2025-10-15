@@ -62,7 +62,7 @@ class FirestoreService {
     try {
       final snapshot = await _db.collection('db_user').get();
       return snapshot.docs.map((doc) {
-        return UserModel.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+        return UserModel.fromMap(doc.id, doc.data());
       }).toList();
     } catch (e) {
       print('❌ Error fetching users: $e');
@@ -107,19 +107,29 @@ class FirestoreService {
     required String receiverUid,
     required String message,
   }) async {
-    final msgData = {
+    final timestamp = FieldValue.serverTimestamp();
+
+    final msgDataForReceiver = {
       'senderUid': senderUid,
       'receiverUid': receiverUid,
       'message': message,
-      'timestamp': FieldValue.serverTimestamp(),
-      'viewStatus': false,
+      'timestamp': timestamp,
+      'viewStatus': false, // UNREAD for receiver
+    };
+
+    final msgDataForSender = {
+      'senderUid': senderUid,
+      'receiverUid': receiverUid,
+      'message': message,
+      'timestamp': timestamp,
+      'viewStatus': true, // always read for sender
     };
 
     final senderRef = _db.collection('db_user').doc(senderUid).collection('chats').doc(receiverUid);
     final receiverRef = _db.collection('db_user').doc(receiverUid).collection('chats').doc(senderUid);
 
-    await senderRef.set({'messages': FieldValue.arrayUnion([msgData])}, SetOptions(merge: true));
-    await receiverRef.set({'messages': FieldValue.arrayUnion([msgData])}, SetOptions(merge: true));
+    await senderRef.set({'messages': FieldValue.arrayUnion([msgDataForSender])}, SetOptions(merge: true));
+    await receiverRef.set({'messages': FieldValue.arrayUnion([msgDataForReceiver])}, SetOptions(merge: true));
   }
 
   /// Mark messages as read
