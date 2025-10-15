@@ -35,10 +35,25 @@ class _HomeScreenState extends State<HomeScreen> {
       filteredUsers = fetchedUsers;
     });
 
-    // Listen for unread counts for each user
+    // Batch fetch unread counts
+    Map<String, int> batchCounts = {};
+    await Future.wait(users.map((user) async {
+      if (user.uid == _auth.currentUser!.uid) return;
+      int count = await _firestoreService.getUnreadMessageCount(
+        senderUid: user.uid,
+        receiverUid: _auth.currentUser!.uid,
+      );
+      batchCounts[user.uid] = count;
+    }));
+
+    setState(() {
+      unreadCounts = batchCounts;
+    });
+
+    // Optional: Set up live streams after initial batch fetch
     for (var user in users) {
       if (user.uid == _auth.currentUser!.uid) continue;
-      if (unreadStreams[user.uid] != null) continue; // already listening
+      if (unreadStreams[user.uid] != null) continue;
 
       Stream<int> stream = _firestoreService.unreadMessageCountStream(
         senderUid: user.uid,
