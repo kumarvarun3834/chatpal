@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "18544043319",
+    "firebase_url": "https://chatpal-b93a8-default-rtdb.firebaseio.com",
     "project_id": "chatpal-b93a8",
     "storage_bucket": "chatpal-b93a8.firebasestorage.app"
   },

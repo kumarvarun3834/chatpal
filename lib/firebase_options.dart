@@ -46,6 +46,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '18544043319',
     projectId: 'chatpal-b93a8',
     authDomain: 'chatpal-b93a8.firebaseapp.com',
+    databaseURL: 'https://chatpal-b93a8-default-rtdb.firebaseio.com',
     storageBucket: 'chatpal-b93a8.firebasestorage.app',
     measurementId: 'G-C942QZNNM3',
   );
@@ -55,6 +56,7 @@ class DefaultFirebaseOptions {
     appId: '1:18544043319:android:93d1bda8dd6b021594a6b2',
     messagingSenderId: '18544043319',
     projectId: 'chatpal-b93a8',
+    databaseURL: 'https://chatpal-b93a8-default-rtdb.firebaseio.com',
     storageBucket: 'chatpal-b93a8.firebasestorage.app',
   );
 
@@ -63,6 +65,7 @@ class DefaultFirebaseOptions {
     appId: '1:18544043319:ios:7410c2635679556194a6b2',
     messagingSenderId: '18544043319',
     projectId: 'chatpal-b93a8',
+    databaseURL: 'https://chatpal-b93a8-default-rtdb.firebaseio.com',
     storageBucket: 'chatpal-b93a8.firebasestorage.app',
     iosBundleId: 'com.kumarvarun3834.chatpal',
   );
@@ -72,6 +75,7 @@ class DefaultFirebaseOptions {
     appId: '1:18544043319:ios:7410c2635679556194a6b2',
     messagingSenderId: '18544043319',
     projectId: 'chatpal-b93a8',
+    databaseURL: 'https://chatpal-b93a8-default-rtdb.firebaseio.com',
     storageBucket: 'chatpal-b93a8.firebasestorage.app',
     iosBundleId: 'com.kumarvarun3834.chatpal',
   );
@@ -82,7 +86,9 @@ class DefaultFirebaseOptions {
     messagingSenderId: '18544043319',
     projectId: 'chatpal-b93a8',
     authDomain: 'chatpal-b93a8.firebaseapp.com',
+    databaseURL: 'https://chatpal-b93a8-default-rtdb.firebaseio.com',
     storageBucket: 'chatpal-b93a8.firebasestorage.app',
     measurementId: 'G-179BRS69NQ',
   );
+
 }

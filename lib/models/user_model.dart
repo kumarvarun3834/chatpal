@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// User model for ChatPal app (UID-based)
+/// User model for ChatPal app with unread message support
 class UserModel {
   final String uid;             // Firestore UID
   final String email;
@@ -8,12 +8,15 @@ class UserModel {
   final String bio;
   final String profilePicture;  // Firebase Storage URL
 
+  int unreadCount;              // Not stored in Firestore, dynamic
+
   UserModel({
     required this.uid,
     required this.email,
     required this.name,
     required this.bio,
     required this.profilePicture,
+    this.unreadCount = 0,
   });
 
   /// Convert UserModel to Map for Firestore
@@ -28,42 +31,29 @@ class UserModel {
   }
 
   /// Convert Firestore document to UserModel
-  factory UserModel.fromMap(String uid, Map<String, dynamic> map) {
+  factory UserModel.fromMap(String uid, Map<String, dynamic> map, {int unreadCount = 0}) {
     return UserModel(
       uid: uid,
       email: map['email'] ?? '',
       name: map['name'] ?? '',
       bio: map['bio'] ?? '',
       profilePicture: map['profilePicture'] ?? '',
+      unreadCount: unreadCount,
     );
   }
 }
 
-/// Firestore helper for user and chat operations
+/// Firestore service for user and chat operations
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  /// Create or update user in db_user collection (using UID)
+  /// Create or update user
   Future<void> createUser(UserModel user) async {
     try {
       await _db.collection('db_user').doc(user.uid).set(user.toMap());
       print('✅ User created/updated: ${user.email}');
     } catch (e) {
       print('❌ Error creating user: $e');
-    }
-  }
-
-  /// Fetch user by UID
-  Future<UserModel?> getUser(String uid) async {
-    try {
-      final doc = await _db.collection('db_user').doc(uid).get();
-      if (doc.exists) {
-        return UserModel.fromMap(uid, doc.data() as Map<String, dynamic>);
-      }
-      return null;
-    } catch (e) {
-      print('❌ Error fetching user: $e');
-      return null;
     }
   }
 
@@ -80,9 +70,36 @@ class FirestoreService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // 🔹 CHAT OPERATIONS (UID-based)
-  // ----------------------------------------------------------------
+  /// Get unread message count
+  Future<int> getUnreadMessageCount({
+    required String senderUid,
+    required String receiverUid,
+  }) async {
+    try {
+      final docRef = _db.collection('db_user').doc(receiverUid).collection('chats').doc(senderUid);
+      final snapshot = await docRef.get();
+      if (!snapshot.exists) return 0;
+
+      final messages = List<Map<String, dynamic>>.from(snapshot.data()?['messages'] ?? []);
+      return messages.where((msg) => msg['viewStatus'] == false && msg['senderUid'] == senderUid).length;
+    } catch (e) {
+      print('❌ Error fetching unread count: $e');
+      return 0;
+    }
+  }
+
+  /// Stream of unread message count
+  Stream<int> unreadMessageCountStream({
+    required String senderUid,
+    required String receiverUid,
+  }) {
+    final docRef = _db.collection('db_user').doc(receiverUid).collection('chats').doc(senderUid);
+    return docRef.snapshots().map((snapshot) {
+      if (!snapshot.exists) return 0;
+      final messages = List<Map<String, dynamic>>.from(snapshot.data()?['messages'] ?? []);
+      return messages.where((msg) => msg['viewStatus'] == false && msg['senderUid'] == senderUid).length;
+    });
+  }
 
   /// Send a message (stored under both sender & receiver)
   Future<void> sendMessage({
@@ -90,49 +107,19 @@ class FirestoreService {
     required String receiverUid,
     required String message,
   }) async {
-    final timestamp = FieldValue.serverTimestamp();
-
     final msgData = {
-      'message': message,
       'senderUid': senderUid,
-      'sentDate': timestamp,
+      'receiverUid': receiverUid,
+      'message': message,
+      'timestamp': FieldValue.serverTimestamp(),
       'viewStatus': false,
     };
 
     final senderRef = _db.collection('db_user').doc(senderUid).collection('chats').doc(receiverUid);
     final receiverRef = _db.collection('db_user').doc(receiverUid).collection('chats').doc(senderUid);
 
-    try {
-      await senderRef.set({
-        'messages': FieldValue.arrayUnion([msgData])
-      }, SetOptions(merge: true));
-
-      await receiverRef.set({
-        'messages': FieldValue.arrayUnion([msgData])
-      }, SetOptions(merge: true));
-
-      print('✅ Message sent from $senderUid to $receiverUid');
-    } catch (e) {
-      print('❌ Error sending message: $e');
-    }
-  }
-
-  /// Stream messages between two users
-  Stream<List<Map<String, dynamic>>> getMessages({
-    required String userUid,
-    required String chatPartnerUid,
-  }) {
-    return _db
-        .collection('db_user')
-        .doc(userUid)
-        .collection('chats')
-        .doc(chatPartnerUid)
-        .snapshots()
-        .map((doc) {
-      if (!doc.exists) return [];
-      final data = doc.data();
-      return List<Map<String, dynamic>>.from(data?['messages'] ?? []);
-    });
+    await senderRef.set({'messages': FieldValue.arrayUnion([msgData])}, SetOptions(merge: true));
+    await receiverRef.set({'messages': FieldValue.arrayUnion([msgData])}, SetOptions(merge: true));
   }
 
   /// Mark messages as read
@@ -141,7 +128,6 @@ class FirestoreService {
     required String senderUid,
   }) async {
     final docRef = _db.collection('db_user').doc(receiverUid).collection('chats').doc(senderUid);
-
     final snapshot = await docRef.get();
     if (!snapshot.exists) return;
 
@@ -152,6 +138,5 @@ class FirestoreService {
     }).toList();
 
     await docRef.update({'messages': updatedMessages});
-    print('✅ Messages marked as read');
   }
 }

@@ -41,9 +41,27 @@ class MessageModel {
       media: map['media'] ?? '',
     );
   }
+
+  /// Stream of unread message count
+  static Stream<int> unreadMessageCountStream({
+    required String senderUid,
+    required String receiverUid,
+  }) {
+    final docRef = FirebaseFirestore.instance
+        .collection('db_user')
+        .doc(receiverUid)
+        .collection('chats')
+        .doc(senderUid);
+
+    return docRef.snapshots().map((snapshot) {
+      if (!snapshot.exists) return 0;
+      final messages = List<Map<String, dynamic>>.from(snapshot.data()?['messages'] ?? []);
+      return messages.where((msg) => msg['viewStatus'] == false && msg['senderUid'] == senderUid).length;
+    });
+  }
 }
 
-/// Firestore helper for messages
+/// Service for sending and streaming messages
 class MessageService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -53,45 +71,29 @@ class MessageService {
     required String receiverEmail,
     required MessageModel message,
   }) async {
-    try {
-      // References to both users’ chat paths
-      final senderRef = _db
-          .collection('db_user')
-          .doc(senderEmail)
-          .collection(receiverEmail)
-          .doc(); // auto message ID
+    final senderRef = _db.collection('db_user').doc(senderEmail).collection(receiverEmail).doc();
+    final receiverRef = _db.collection('db_user').doc(receiverEmail).collection(senderEmail).doc();
 
-      final receiverRef = _db
-          .collection('db_user')
-          .doc(receiverEmail)
-          .collection(senderEmail)
-          .doc(); // same mirrored message
+    await _db.runTransaction((txn) async {
+      // Add "sent" message for sender
+      txn.set(senderRef, message.toMap());
 
-      await _db.runTransaction((txn) async {
-        // Add "sent" message for sender
-        txn.set(senderRef, message.toMap());
-
-        // Add mirrored "received" message for receiver
-        txn.set(
-          receiverRef,
-          MessageModel(
-            senderEmail: senderEmail,
-            type: 'received',
-            sentDate: message.sentDate,
-            message: message.message,
-            viewStatus: false,
-            media: message.media,
-          ).toMap(),
-        );
-      });
-
-      print('✅ Message sent between $senderEmail and $receiverEmail');
-    } catch (e) {
-      print('❌ Error sending message: $e');
-    }
+      // Add mirrored "received" message for receiver
+      txn.set(
+        receiverRef,
+        MessageModel(
+          senderEmail: senderEmail,
+          type: 'received',
+          sentDate: message.sentDate,
+          message: message.message,
+          viewStatus: false,
+          media: message.media,
+        ).toMap(),
+      );
+    });
   }
 
-  /// Stream messages between two users (live updates)
+  /// Stream messages between two users
   Stream<List<MessageModel>> streamMessages({
     required String userEmail,
     required String chatPartnerEmail,
@@ -102,9 +104,7 @@ class MessageService {
         .collection(chatPartnerEmail)
         .orderBy('sentDate', descending: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-        .map((doc) => MessageModel.fromMap(doc.data()))
-        .toList());
+        .map((snapshot) => snapshot.docs.map((d) => MessageModel.fromMap(d.data())).toList());
   }
 
   /// Mark all unread messages from sender as read
@@ -112,35 +112,15 @@ class MessageService {
     required String receiverEmail,
     required String senderEmail,
   }) async {
-    try {
-      final query = await _db
-          .collection('db_user')
-          .doc(receiverEmail)
-          .collection(senderEmail)
-          .where('viewStatus', isEqualTo: false)
-          .get();
+    final query = await _db
+        .collection('db_user')
+        .doc(receiverEmail)
+        .collection(senderEmail)
+        .where('viewStatus', isEqualTo: false)
+        .get();
 
-      for (var doc in query.docs) {
-        await doc.reference.update({'viewStatus': true});
-      }
-
-      print('✅ Marked messages as read for $receiverEmail from $senderEmail');
-    } catch (e) {
-      print('❌ Error marking messages as read: $e');
+    for (var doc in query.docs) {
+      await doc.reference.update({'viewStatus': true});
     }
   }
 }
-
-//
-// db_user
-// └── bee@gmail.com
-// ├── xyz@gmail.com     ← chat partner
-// │    ├── autoMsgId1
-// │    │     ├── senderEmail: "bee@gmail.com"
-// │    │     ├── message: "Hey"
-// │    │     ├── type: "sent"
-// │    │     ├── viewStatus: true
-// │    │     ├── sentDate: ...
-// │    │     └── media: ""
-// │    └── autoMsgId2 ...
-//

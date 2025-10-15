@@ -105,4 +105,26 @@ class FirestoreService {
         .doc(messageId)
         .update({'status': 'read'});
   }
+
+  /// -------------------------------
+  /// UNREAD MESSAGE COUNT
+  /// -------------------------------
+  /// Returns the number of unread messages between two users.
+  ///
+  Future<int> getUnreadMessageCount({
+    required String senderUid,
+    required String receiverUid,
+  }) async {
+    final chatId = getChatId(senderUid, receiverUid);
+    final snapshot = await _db
+        .collection(chatsCollection)
+        .doc(chatId)
+        .collection('messages')
+        .where('receiverUid', isEqualTo: receiverUid)
+        .where('status', isEqualTo: 'sent') // or 'delivered' if you count delivered but unread
+        .get();
+
+    return snapshot.docs.length;
+  }
+
 }
