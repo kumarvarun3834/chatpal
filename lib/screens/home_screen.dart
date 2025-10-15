@@ -3,7 +3,6 @@ import 'package:chatpal/screens/chat_screen.dart';
 import 'package:chatpal/screens/profile_module.dart';
 import 'package:chatpal/models/user_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-// import '../services/firestore_service.dart';
 import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -22,6 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Map<String, int> unreadCounts = {}; // unread messages per user
   Map<String, Stream<int>> unreadStreams = {}; // store streams
+  UserModel? currentUserModel; // stores logged-in user info
 
   @override
   void initState() {
@@ -50,15 +50,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void fetchUsers() async {
-    // 1. Fetch all users from Firestore
+    // 1. Fetch all users
     List<UserModel> fetchedUsers = await _firestoreService.getAllUsers();
+
+    // 2. Set current user model
+    UserModel loggedInUser = fetchedUsers.firstWhere(
+          (user) => user.uid == _auth.currentUser!.uid,
+      orElse: () => UserModel(
+        uid: _auth.currentUser!.uid,
+        name: _auth.currentUser!.displayName ?? '',
+        email: _auth.currentUser!.email ?? '',
+        profilePicture: '',
+        bio: '',
+      ),
+    );
 
     setState(() {
       users = fetchedUsers;
-      filteredUsers = fetchedUsers; // initially show all
+      filteredUsers = fetchedUsers;
+      currentUserModel = loggedInUser;
     });
 
-    // 2. Fetch unread message counts for each user
+    // 3. Fetch unread message counts
     Map<String, int> batchCounts = {};
     await Future.wait(users.map((user) async {
       if (user.uid == _auth.currentUser!.uid) return;
@@ -73,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
       unreadCounts = batchCounts;
     });
 
-    // 3. Optional: Set up live streams to auto-update unread counts
+    // 4. Setup live streams for unread messages
     for (var user in users) {
       if (user.uid == _auth.currentUser!.uid) continue;
       if (unreadStreams[user.uid] != null) continue;
@@ -91,15 +104,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
       unreadStreams[user.uid] = stream;
     }
-    UserModel currentUserModel = users.firstWhere(
-          (user) => user.uid == _auth.currentUser!.uid,
-      orElse: () => UserModel(
-        uid: _auth.currentUser!.uid,
-        name: _auth.currentUser!.displayName ?? '',
-        email: _auth.currentUser!.email ?? '',
-        profilePicture: '',
-        bio: '',
-      ),
+  }
+
+  void logout() async {
+    await _auth.signOut();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => LoginScreen()),
     );
   }
 
@@ -125,14 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: Icon(showSearch ? Icons.close : Icons.search),
-            onPressed: () {
-              setState(() {
-                showSearch = !showSearch;
-                if (!showSearch) {
-                  filteredUsers = users; // reset search when closing
-                }
-              });
-            },
+            onPressed: _toggleSearch,
           ),
         ],
         leading: Builder(
@@ -153,16 +156,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   CircleAvatar(
                     radius: 30,
-                    backgroundImage: currentUserModel.profilePicture.isNotEmpty
-                        ? NetworkImage(currentUserModel.profilePicture)
+                    backgroundImage: currentUserModel?.profilePicture.isNotEmpty == true
+                        ? NetworkImage(currentUserModel!.profilePicture)
                         : null,
-                    child: currentUserModel.profilePicture.isEmpty
+                    child: currentUserModel?.profilePicture.isEmpty == true
                         ? Icon(Icons.person)
                         : null,
                   ),
                   SizedBox(height: 10),
                   Text(
-                    _auth.currentUser?.email ?? 'No Email',
+                    currentUserModel?.email ?? 'No Email',
                     style: TextStyle(color: Colors.white, fontSize: 16),
                   ),
                 ],
@@ -176,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (_) => ProfileSetupScreen(
-                      email: _auth.currentUser?.email ?? '',
+                      email: currentUserModel?.email ?? '',
                     ),
                   ),
                 );
@@ -185,20 +188,15 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: Icon(Icons.logout),
               title: Text('Logout'),
-              onTap: () async {
-                await _auth.signOut();
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => LoginScreen()),
-                );
-              },
+              onTap: logout,
             ),
           ],
         ),
       ),
       body: Column(
         children: [
-          // Only show search bar if button tapped
-          if (showSearch && !filteredUsers.isEmpty)
+          // Optional: Show search results count
+          if (showSearch && searchQuery.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Text(
@@ -206,7 +204,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(fontSize: 14 * textScale),
               ),
             ),
-
           Expanded(
             child: filteredUsers.isEmpty
                 ? Center(child: Text('No users found'))

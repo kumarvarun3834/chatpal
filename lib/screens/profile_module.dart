@@ -1,7 +1,7 @@
 import 'dart:io';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'home_screen.dart';
@@ -40,7 +40,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     if (doc.exists) {
       final data = doc.data()!;
       nameController.text = data['name'] ?? '';
-      bioController.text = data['bio'] ?? 'Hey there! I am using ChatPal.'; // default bio
+      bioController.text = data['bio'] ?? 'Hey there! I am using ChatPal.';
     } else {
       bioController.text = 'Hey there! I am using ChatPal.';
     }
@@ -58,26 +58,37 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('No user logged in')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No user logged in')),
+      );
       setState(() => _isLoading = false);
       return;
     }
 
     String imageUrl = '';
-    if (_profileImage != null) {
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_pictures')
-          .child('${user.uid}.jpg');
-      await storageRef.putFile(_profileImage!);
-      imageUrl = await storageRef.getDownloadURL();
+    if (_profileImage != null && await _profileImage!.exists()) {
+      try {
+        final storageRef = FirebaseStorage.instance
+            .ref()
+            .child('profile_pictures')
+            .child('${user.uid}.jpg');
+
+        UploadTask uploadTask = storageRef.putFile(_profileImage!);
+
+        // Wait for completion
+        TaskSnapshot snapshot = await uploadTask.whenComplete(() {});
+
+        // Only now get the URL
+        imageUrl = await snapshot.ref.getDownloadURL();
+      } catch (e) {
+        print('Upload failed: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload profile image.')),
+        );
+      }
     }
 
-    await FirebaseFirestore.instance
-        .collection('db_user')
-        .doc(user.uid)
-        .set({
+    await FirebaseFirestore.instance.collection('db_user').doc(user.uid).set({
       'name': nameController.text.trim(),
       'bio': bioController.text.trim(),
       'profilePicture': imageUrl,

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
-import 'profile_setup_screen.dart';
+import 'profile_module.dart';
 
 class ProfileCreationScreen extends StatefulWidget {
   @override
