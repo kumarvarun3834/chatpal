@@ -36,7 +36,7 @@ It enables secure one-to-one messaging with support for text messages, user prof
 ---
 
 ## 📂 Project Structure
-
+```
 lib/
 ├── main.dart               # Application entry point
 ├── screens/                # UI screens: Login, Chat, Profile, etc.
@@ -45,7 +45,7 @@ lib/
 ├── providers/              # State management (Provider)
 ├── services/               # Firebase and business logic handlers
 └── utils/                  # Constants, helpers, and utilities
-
+```
 ---
 
 ## 🔧 Getting Started (Setup Instructions)
@@ -95,7 +95,7 @@ lib/
 ## 🧩 Technical Implementation Highlights
 
 * **Realtime chat**: Firestore snapshot listeners for instant updates
-* **Message Status**: Sent and Read tracked; Unread tracking in progress
+* **Message Status**: Sent and Read tracked; delivered tracking in progress
 * **Theme Support**: Automatically adapts to system light/dark mode
 * **Authentication**: Users must verify email to access chat
 
@@ -113,24 +113,6 @@ lib/
 ## 📸 Screenshots / Demo
 
 > *Add screenshots of Login, Chat, Profile, Search, and theme switching here.*
-
----
-
-## 🧭 Contributing
-
-Contributions are welcome!
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/YourFeature`)
-3. Commit your changes (`git commit -m "Add <feature>"`)
-4. Push to branch (`git push origin feature/YourFeature`)
-5. Open a Pull Request
-
----
-
-## 📜 License
-
-Specify your license here (e.g. MIT, Apache 2.0).
 
 ---
 
