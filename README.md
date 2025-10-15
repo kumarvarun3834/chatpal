@@ -112,7 +112,7 @@ lib/
 
 ## 📸 Screenshots / Demo
 
-> *Add screenshots of Login, Chat, Profile, Search, and theme switching here.*
+> https://drive.google.com/drive/folders/1aBnZDgpSAGOlOKjiz1VsLMrOtTHrjReV?usp=sharing
 
 ---
 
