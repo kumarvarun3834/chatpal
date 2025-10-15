@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
+// import '../services/firestore_service.dart';
 import 'profile_module.dart';
 
 class ProfileCreationScreen extends StatefulWidget {
@@ -11,10 +12,11 @@ class ProfileCreationScreen extends StatefulWidget {
 
 class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
   final AuthService _auth = AuthService();
+  final FirestoreService _firestoreService = FirestoreService();
+
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmController = TextEditingController();
-  final FirestoreService _firestoreService = FirestoreService();
 
   bool _isLoading = false;
 
@@ -24,103 +26,104 @@ class _ProfileCreationScreenState extends State<ProfileCreationScreen> {
     String confirm = confirmController.text.trim();
 
     if (password != confirm) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Passwords do not match')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match')),
+      );
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      // Create user with FirebaseAuth
+      // Create new Firebase user
       UserCredential result = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
 
       User? user = result.user;
 
       if (user != null) {
-        // -------------------------
-        // Email verification logic
-        // -------------------------
-        /*
+        // Send verification email
         if (!user.emailVerified) {
           await user.sendEmailVerification();
-
-          setState(() => _isLoading = false);
-
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => AlertDialog(
-              title: const Text('Verify Your Email'),
-              content: Text(
-                'A verification email has been sent to $email. Please verify it before continuing.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () async {
-                    await user.reload();
-                    User? refreshedUser = FirebaseAuth.instance.currentUser;
-
-                    if (refreshedUser != null && refreshedUser.emailVerified) {
-                      Navigator.pop(context); // close dialog
-
-                      final newUser = UserModel(
-                        email: email,
-                        name: '',
-                        bio: '',
-                        profilePicture: '',
-                      );
-                      await _firestoreService.createUser(newUser);
-
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProfileSetupScreen(email: email),
-                        ),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Email not verified yet.'),
-                        ),
-                      );
-                    }
-                  },
-                  child: const Text('I Verified'),
-                ),
-              ],
-            ),
-          );
         }
-        */
-
-        // -------------------------
-        // Direct Firestore creation
-        // -------------------------
-        final newUser = UserModel(
-          email: email,
-          name: '',
-          bio: '',
-          profilePicture: '',
-          uid: FirebaseAuth.instance.currentUser!.uid, // add UID here
-        );
-
-        await _firestoreService.createUser(newUser);
 
         setState(() => _isLoading = false);
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProfileSetupScreen(email: email),
+        // Show verification dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Verify Your Email'),
+            content: Text(
+              'A verification email has been sent to $email.\n'
+                  'Please verify it before continuing.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  await user.reload();
+                  User? refreshedUser = FirebaseAuth.instance.currentUser;
+
+                  if (refreshedUser != null && refreshedUser.emailVerified) {
+                    Navigator.pop(context); // Close dialog
+
+                    // Add user to Firestore after verification
+                    final newUser = UserModel(
+                      uid: refreshedUser.uid,
+                      email: email,
+                      name: email,
+                      bio: 'hey i am using chatpal',
+                      profilePicture: '',
+                    );
+                    await _firestoreService.createUser(newUser);
+
+                    // Navigate to Profile Setup
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProfileSetupScreen(email: email),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Email not verified yet. Please check your inbox.'),
+                      ),
+                    );
+                  }
+                },
+                child: const Text('I Verified'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  try {
+                    await user.sendEmailVerification();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Verification email resent.')),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to resend email: $e')),
+                    );
+                  }
+                },
+                child: const Text('Resend Email'),
+              ),
+            ],
           ),
         );
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message ?? 'Sign-up failed')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? 'Sign-up failed')),
+      );
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unexpected error: $e')),
+      );
     }
   }
 
