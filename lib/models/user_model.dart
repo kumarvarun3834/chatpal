@@ -149,4 +149,32 @@ class FirestoreService {
 
     await docRef.update({'messages': updatedMessages});
   }
+
+  /// Get last message between two users
+  Future<String> getLastMessage({
+    required String senderUid,
+    required String receiverUid,
+  }) async {
+    try {
+      final docRef = _db
+          .collection('db_user')
+          .doc(receiverUid)
+          .collection('chats')
+          .doc(senderUid);
+      final snapshot = await docRef.get();
+      if (!snapshot.exists) return '';
+
+      final messages = List<Map<String, dynamic>>.from(snapshot.data()?['messages'] ?? []);
+      if (messages.isEmpty) return '';
+
+      // Sort by timestamp descending
+      messages.sort((a, b) => (b['timestamp'] ?? 0).compareTo(a['timestamp'] ?? 0));
+
+      return messages.first['text'] ?? '';
+    } catch (e) {
+      print('❌ Error fetching last message: $e');
+      return '';
+    }
+  }
+
 }

@@ -18,6 +18,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<UserModel> users = [];
   List<UserModel> filteredUsers = [];
   String searchQuery = '';
+  bool showSearch = false; // Controls visibility of search bar
 
   Map<String, int> unreadCounts = {}; // unread messages per user
   Map<String, Stream<int>> unreadStreams = {}; // store streams
@@ -28,14 +29,36 @@ class _HomeScreenState extends State<HomeScreen> {
     fetchUsers();
   }
 
+  void _toggleSearch() {
+    setState(() {
+      showSearch = !showSearch;
+      if (!showSearch) {
+        searchQuery = '';
+        filteredUsers = users;
+      }
+    });
+  }
+
+  void _filterUsers(String query) {
+    final lowerQuery = query.toLowerCase();
+    setState(() {
+      searchQuery = query;
+      filteredUsers = users
+          .where((user) => user.name.toLowerCase().contains(lowerQuery))
+          .toList();
+    });
+  }
+
   void fetchUsers() async {
+    // 1. Fetch all users from Firestore
     List<UserModel> fetchedUsers = await _firestoreService.getAllUsers();
+
     setState(() {
       users = fetchedUsers;
-      filteredUsers = fetchedUsers;
+      filteredUsers = fetchedUsers; // initially show all
     });
 
-    // Batch fetch unread counts
+    // 2. Fetch unread message counts for each user
     Map<String, int> batchCounts = {};
     await Future.wait(users.map((user) async {
       if (user.uid == _auth.currentUser!.uid) return;
@@ -50,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
       unreadCounts = batchCounts;
     });
 
-    // Optional: Set up live streams after initial batch fetch
+    // 3. Optional: Set up live streams to auto-update unread counts
     for (var user in users) {
       if (user.uid == _auth.currentUser!.uid) continue;
       if (unreadStreams[user.uid] != null) continue;
@@ -68,23 +91,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
       unreadStreams[user.uid] = stream;
     }
-  }
-
-  void logout() async {
-    await _auth.signOut();
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => LoginScreen()),
+    UserModel currentUserModel = users.firstWhere(
+          (user) => user.uid == _auth.currentUser!.uid,
+      orElse: () => UserModel(
+        uid: _auth.currentUser!.uid,
+        name: _auth.currentUser!.displayName ?? '',
+        email: _auth.currentUser!.email ?? '',
+        profilePicture: '',
+        bio: '',
+      ),
     );
-  }
-
-  void _filterUsers(String query) {
-    final lowerQuery = query.toLowerCase();
-    setState(() {
-      searchQuery = query;
-      filteredUsers = users
-          .where((user) => user.name.toLowerCase().contains(lowerQuery))
-          .toList();
-    });
   }
 
   @override
@@ -93,9 +109,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
+        title: showSearch
+            ? TextField(
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: 'Search users...',
+            border: InputBorder.none,
+          ),
+          onChanged: _filterUsers,
+        )
+            : Text(
           'ChatPal',
           style: TextStyle(fontSize: 20 * textScale),
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(showSearch ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() {
+                showSearch = !showSearch;
+                if (!showSearch) {
+                  filteredUsers = users; // reset search when closing
+                }
+              });
+            },
+          ),
+        ],
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
         ),
       ),
       drawer: Drawer(
@@ -109,9 +153,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   CircleAvatar(
                     radius: 30,
-                    backgroundImage: NetworkImage(
-                      'https://i.pravatar.cc/150?img=3',
-                    ),
+                    backgroundImage: currentUserModel.profilePicture.isNotEmpty
+                        ? NetworkImage(currentUserModel.profilePicture)
+                        : null,
+                    child: currentUserModel.profilePicture.isEmpty
+                        ? Icon(Icons.person)
+                        : null,
                   ),
                   SizedBox(height: 10),
                   Text(
@@ -138,29 +185,28 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: Icon(Icons.logout),
               title: Text('Logout'),
-              onTap: logout,
+              onTap: () async {
+                await _auth.signOut();
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => LoginScreen()),
+                );
+              },
             ),
           ],
         ),
       ),
       body: Column(
         children: [
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search users...',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+          // Only show search bar if button tapped
+          if (showSearch && !filteredUsers.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                'Showing ${filteredUsers.length} results',
+                style: TextStyle(fontSize: 14 * textScale),
               ),
-              onChanged: _filterUsers,
             ),
-          ),
 
-          // Users list
           Expanded(
             child: filteredUsers.isEmpty
                 ? Center(child: Text('No users found'))
